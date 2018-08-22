@@ -166,7 +166,7 @@ def adaptive_hinge_loss(positive_predictions, negative_predictions, mask=None):
     return hinge_loss(positive_predictions, highest_negative_predictions.squeeze(), mask=mask)
 
 
-def regression_loss(observed_ratings, predicted_ratings):
+def regression_loss(observed_ratings, predicted_ratings, mask=None):
     """
     Regression loss.
 
@@ -185,9 +185,55 @@ def regression_loss(observed_ratings, predicted_ratings):
         The mean value of the loss function.
     """
 
-    assert_no_grad(observed_ratings)
+    if mask is None:
+        assert_no_grad(observed_ratings)
 
-    return ((observed_ratings - predicted_ratings) ** 2).mean()
+    loss = (observed_ratings - predicted_ratings) ** 2
+
+    if mask is not None:
+        try:
+            mask = mask.float()
+        except:
+            pass
+        loss = loss * mask
+        return (loss.sum() / mask.sum()) ** 0.5
+
+    return loss.mean()
+
+
+def squared_errors(observed_ratings, predicted_ratings, mask=None):
+    """
+    Regression loss.
+
+    Parameters
+    ----------
+
+    observed_ratings: tensor
+        Tensor containing observed ratings.
+    predicted_ratings: tensor
+        Tensor containing rating predictions.
+
+    Returns
+    -------
+
+    loss, float
+        The mean value of the loss function.
+    """
+
+    if mask is None:
+        assert_no_grad(observed_ratings)
+
+    loss = (observed_ratings - predicted_ratings) ** 2
+
+    if mask is not None:
+        try:
+            mask = mask.float()
+        except:
+            pass
+        loss = loss * mask
+        return loss.sum(), mask.sum()
+
+    return loss.sum(), len(loss)
 
 
 def poisson_loss(observed_ratings, predicted_ratings):

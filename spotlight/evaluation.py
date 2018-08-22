@@ -1,3 +1,5 @@
+from spotlight.losses import regression_loss, squared_errors
+from spotlight.sequence.representations import PADDING_IDX
 import numpy as np
 
 import scipy.stats as st
@@ -100,6 +102,65 @@ def sequence_mrr_score(model, test, exclude_preceding=False):
         mrrs.append(mrr)
 
     return np.array(mrrs)
+
+
+def sequence_rmse_score(model, test, ratings, k=10):
+    """
+    Compute sequence precision and recall scores. Each sequence
+    in test is split into two parts: the first part, containing
+    all but the last k elements, is used to predict the last k
+    elements.
+
+    Parameters
+    ----------
+
+    model: fitted instance of a recommender model
+        The model to evaluate.
+    test: :class:`spotlight.interactions.SequenceInteractions`
+        Test interactions.
+    exclude_preceding: boolean, optional
+        When true, items already present in the sequence will
+        be excluded from evaluation.
+
+    Returns
+    -------
+
+    mrr scores: numpy array of shape (num_users,)
+        Array of MRR scores for each sequence in test.
+    """
+    sequences = test.sequences
+    sum_squared_errors = 0
+
+    #user_batch = test.user_ids[batch_indices]
+    #truth = np.array([ratings[u, i] for u, i in np.broadcast(user_batch[:, None], item_batch)]).reshape(-1, interactions.max_sequence_length - 1)
+
+    # all_pred = model.predict(sequences)
+    # print('just test', all_pred.shape)
+
+    all_pred = []
+    nb_entries = 0
+    for i in range(len(sequences)):
+        # print('pred', predictions.shape)
+        user_batch = np.array(test.user_ids[i])  # [:, None]
+        # print(np.broadcast(user_batch, item_batch))
+        truth = np.array([ratings[u, i] for u, i in np.broadcast(user_batch, sequences[i])]).reshape(1, -1)
+        item_batch = sequences[i][1:]
+        # print(truth, truth[:5])
+        # print('truth', truth.shape)
+
+        predictions = model.predict(sequences[i], truth)
+        all_pred.append(predictions)
+
+        mask = item_batch != PADDING_IDX
+        sum_se, nb = squared_errors(truth[:, 1:], predictions, mask=mask)
+        sum_squared_errors += sum_se
+        nb_entries += nb
+
+        # predictions = predictions.argsort()[:k]
+        # precision_recall = _get_precision_recall(predictions, targets[i], k)
+        # precision_recalls.append(precision_recall)
+
+    return (sum_squared_errors / nb_entries) ** 0.5
 
 
 def sequence_precision_recall_score(model, test, k=10, exclude_preceding=False):
